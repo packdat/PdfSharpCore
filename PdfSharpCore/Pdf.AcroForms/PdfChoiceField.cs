@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,7 +28,7 @@
 #endregion
 
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace PdfSharpCore.Pdf.AcroForms
 {
@@ -41,53 +41,43 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// Initializes a new instance of the <see cref="PdfChoiceField"/> class.
         /// </summary>
         protected PdfChoiceField(PdfDocument document)
-            : base(document)
+          : base(document)
         { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PdfChoiceField"/> class.
         /// </summary>
         protected PdfChoiceField(PdfDictionary dict)
-            : base(dict)
+          : base(dict)
         { }
 
         /// <summary>
         /// Gets the index of the specified string in the /Opt array or -1, if no such string exists.
+        /// <param name="value">Value, for which the index should be retrieved</param>
+        /// <param name="useExportValue">true if value is the export value, false if value is the text shown in the UI</param>
         /// </summary>
-        protected int IndexInOptArray(string value)
+        protected int IndexInOptArray(string value, bool useExportValue)
         {
             PdfArray opt = Elements.GetArray(Keys.Opt);
-
-#if DEBUG  // Check with //R080317 implemention
-            PdfArray opt2 = null;
-            if (Elements[Keys.Opt] is PdfArray)
-                opt2 = Elements[Keys.Opt] as PdfArray;
-            else if (Elements[Keys.Opt] is Advanced.PdfReference)
-            {
-                //falls das Array nicht direkt am Element hängt, 
-                //das Array aus dem referenzierten Element holen
-                opt2 = ((Advanced.PdfReference)Elements[Keys.Opt]).Value as PdfArray;
-            }
-            Debug.Assert(ReferenceEquals(opt, opt2));
-#endif
-
             if (opt != null)
             {
                 int count = opt.Elements.Count;
                 for (int idx = 0; idx < count; idx++)
                 {
                     PdfItem item = opt.Elements[idx];
-                    if (item is PdfString)
+                    if (item is PdfString pdfString)
                     {
-                        if (item.ToString() == value)
+                        if (pdfString.Value == value)
                             return idx;
                     }
                     else if (item is PdfArray)
                     {
                         PdfArray array = (PdfArray)item;
-                        if (array.Elements.Count != 0)
+                        if (array.Elements.Count > 0)
                         {
-                            if (array.Elements[0].ToString() == value)
+                            // Pdf Reference 1.7, Section 12.7.4.4: Should be a 2-element Array. Second value is the text shown in the UI.
+                            if ((!useExportValue && array.Elements.Count > 1 && array.Elements.GetString(1) == value) ||
+                                (array.Elements.Count > 0 && array.Elements.GetString(0) == value))
                                 return idx;
                         }
                     }
@@ -97,9 +87,11 @@ namespace PdfSharpCore.Pdf.AcroForms
         }
 
         /// <summary>
-        /// Gets the value from the index in the /Opt array.
+        /// Gets the value or the display text from the index in the /Opt array.
+        /// <param name="index">Index of the value that should be retrieved</param>
+        /// <param name="useExportValue">true to get the export value, false to get the text shown in the UI</param>
         /// </summary>
-        protected string ValueInOptArray(int index)
+        protected string ValueInOptArray(int index, bool useExportValue)
         {
             PdfArray opt = Elements.GetArray(Keys.Opt);
             if (opt != null)
@@ -109,17 +101,158 @@ namespace PdfSharpCore.Pdf.AcroForms
                     throw new ArgumentOutOfRangeException("index");
 
                 PdfItem item = opt.Elements[index];
-                if (item is PdfString)
-                    return item.ToString();
-
-                if (item is PdfArray)
+                if (item is PdfString pdfString)
+                    return pdfString.Value;
+                else if (item is PdfArray)
                 {
                     PdfArray array = (PdfArray)item;
-                    if (array.Elements.Count != 0)
-                        return array.Elements[0].ToString();
+                    return !useExportValue && array.Elements.Count > 1
+                                  ? array.Elements.GetString(1)
+                                  : array.Elements.GetString(0);
                 }
             }
-            return "";
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Gets or sets the Value for the Field.
+        /// For fields supporting multiple values (e.g. ListBox) use <see cref="PdfListBoxField.SelectedIndices"/> instead
+        /// </summary>
+        public override PdfItem Value
+        {
+            get
+            {
+                var item = base.Value;
+                var pdfArray = item as PdfArray;
+                if (pdfArray != null)
+                {
+                    if (pdfArray.Elements.Count > 0)
+                        item = pdfArray.Elements[0];
+                }
+                if (item is PdfString pdfString)
+                {
+                    // First try the export value
+                    var idx = IndexInOptArray(pdfString.Value, true);
+                    // If that is not found, try the string shown in the UI
+                    if (idx < 0)
+                        idx = IndexInOptArray(pdfString.Value, false);
+                    if (idx < 0)
+                        return null;
+                    // return the display text
+                    return new PdfString(ValueInOptArray(idx, true));
+                }
+                return null;
+            }
+            set { base.Value = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the Default value for the field
+        /// </summary>
+        public override PdfItem DefaultValue
+        {
+            get
+            {
+                var item = base.DefaultValue;
+                var pdfArray = item as PdfArray;
+                if (pdfArray != null)
+                {
+                    if (pdfArray.Elements.Count > 0)
+                        item = pdfArray.Elements[0];
+                }
+                if (item is PdfString pdfString)
+                {
+                    // First try the export value
+                    var idx = IndexInOptArray(pdfString.Value, true);
+                    // If that is not found, try the string shown in the UI
+                    if (idx < 0)
+                        idx = IndexInOptArray(pdfString.Value, false);
+                    if (idx < 0)
+                        return null;
+                    // return the display text
+                    return new PdfString(ValueInOptArray(idx, true));
+                }
+                return null;
+            }
+            set { base.DefaultValue = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the List of options (entries) available for selection.
+        /// This is the list of values shown in the UI.
+        /// </summary>
+        public ICollection<string> Options
+        {
+            get
+            {
+                var result = new List<string>();
+                var options = Elements.GetArray(Keys.Opt);
+                if (options != null)
+                {
+                    foreach (var item in options)
+                    {
+                        var s = item as PdfString;
+                        if (s != null)
+                            result.Add(s.Value);
+                        else
+                        {
+                            var array = item as PdfArray;
+                            if (array != null)
+                            {
+                                // Pdf Reference 1.7, Section 12.7.4.4 : Value is the SECOND entry in the Array
+                                // (the first value is the exported value)
+                                var v = array.Elements.GetString(array.Elements.Count > 1 ? 1 : 0);
+                                if (string.IsNullOrEmpty(v))
+                                    v = string.Empty;
+                                result.Add(v);
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+            set
+            {
+                var ary = new PdfArray(_document);
+                foreach (var item in value)
+                    ary.Elements.Add(new PdfString(item));
+                Elements.SetObject(Keys.Opt, ary);
+            }
+        }
+
+        /// <summary>
+        /// Gets the list of values for this Field.<br></br>
+        /// May or may not be equal to <see cref="Options"/> but has always the same amount of items.
+        /// </summary>
+        public ICollection<string> Values
+        {
+            get
+            {
+                var result = new List<string>();
+                var options = Elements.GetArray(Keys.Opt);
+                if (options != null)
+                {
+                    foreach (var item in options)
+                    {
+                        var s = item as PdfString;
+                        if (s != null)
+                            result.Add(s.Value);
+                        else
+                        {
+                            var array = item as PdfArray;
+                            if (array != null)
+                            {
+                                var ary = array;
+                                var v = ary.Elements.GetString(0);
+                                if (string.IsNullOrEmpty(v))
+                                    v = string.Empty;
+                                result.Add(v);
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
         }
 
         /// <summary>

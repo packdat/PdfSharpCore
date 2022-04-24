@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -38,11 +38,11 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// Initializes a new instance of PdfSignatureField.
         /// </summary>
         internal PdfSignatureField(PdfDocument document)
-            : base(document)
+                : base(document)
         { }
 
         internal PdfSignatureField(PdfDictionary dict)
-            : base(dict)
+                : base(dict)
         { }
 
         /// <summary>

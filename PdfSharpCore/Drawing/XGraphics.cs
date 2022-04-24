@@ -517,7 +517,7 @@ namespace PdfSharpCore.Drawing  // #??? aufräumen
 #if CORE
             TargetContext = XGraphicTargetContext.CORE;
 #endif
-#if CORE || NET5_0
+#if CORE || NETCOREAPP3_1_OR_GREATER
             _drawGraphics = false;
             if (form.Owner != null)
                 _renderer = new XGraphicsPdfRenderer(form, this);

@@ -34,6 +34,8 @@ using System.Collections;
 using PdfSharpCore.Pdf.IO;
 using PdfSharpCore.Pdf.Advanced;
 using PdfSharpCore.Pdf.Annotations;
+using PdfSharpCore.Pdf.AcroForms;
+using System.Linq;
 
 namespace PdfSharpCore.Pdf
 {
@@ -190,6 +192,11 @@ namespace PdfSharpCore.Pdf
 
                 PagesArray.Elements.Insert(index, page.Reference);
                 Elements.SetInteger(Keys.Count, PagesArray.Elements.Count);
+                if (annotationCopying != AnnotationCopyingType.DoNotCopy)
+                {
+                    // Import AcroFields, after the external Page has been imported and we have a valid ObjectID for the imported Page
+                    ImportAcroFields(page, importPage);
+                }
                 PdfAnnotations.FixImportedAnnotation(page);
             }
             if (Owner.Settings.TrimMargins.AreSet)
@@ -500,6 +507,112 @@ namespace PdfSharpCore.Pdf
                     page.Elements[key] = item.Clone();
                 }
             }
+        }
+
+        void ImportAcroFields(PdfPage page, PdfPage importPage)
+        {
+            // skip, if there is no AcroForm or an AcroForm without fields
+            if (importPage.Owner.AcroForm == null || !importPage.Owner.AcroForm.Fields.Names.Any())
+                return;
+            // Note: technically, we need to do this only once per document, but as we have no knowledge when the last page was imported, we do this for every page
+            var importedObjectTable = Owner.FormTable.GetImportedObjectTable(importPage);
+            var needNewForm = _document.Catalog.AcroForm == null;
+            var ourForm = _document.Catalog.AcroForm ?? new PdfAcroForm(_document);
+            if (needNewForm)
+            {
+                var remoteForm = importPage.Owner.AcroForm;
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.CO))
+                    ourForm.Elements[PdfAcroForm.Keys.CO] = ImportClosure(importedObjectTable, _document, remoteForm.Elements.GetObject(PdfAcroForm.Keys.CO));
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.DA))
+                    ourForm.Elements[PdfAcroForm.Keys.DA] = remoteForm.Elements[PdfAcroForm.Keys.DA];
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.DR))
+                    ourForm.Elements[PdfAcroForm.Keys.DR] = ImportClosure(importedObjectTable, _document, remoteForm.Elements.GetObject(PdfAcroForm.Keys.DR));
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.NeedAppearances))
+                    ourForm.Elements[PdfAcroForm.Keys.NeedAppearances] = remoteForm.Elements[PdfAcroForm.Keys.NeedAppearances];
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.Q))
+                    ourForm.Elements[PdfAcroForm.Keys.Q] = remoteForm.Elements[PdfAcroForm.Keys.Q];
+                if (remoteForm.Elements.ContainsKey(PdfAcroForm.Keys.SigFlags))
+                    ourForm.Elements[PdfAcroForm.Keys.SigFlags] = remoteForm.Elements[PdfAcroForm.Keys.SigFlags];
+            }
+            // copy font-resources from the imported AcroForm to the local form
+            var extResources = importPage.Owner.AcroForm.Elements.GetDictionary(PdfAcroForm.Keys.DR);
+            if (extResources != null)
+            {
+                var extFontList = extResources.Elements.GetDictionary(PdfResources.Keys.Font);
+                if (extFontList != null)
+                {
+                    var localResources = ourForm.Elements.GetDictionary(PdfAcroForm.Keys.DR) ?? new PdfDictionary(Owner);
+                    var localFontList = localResources.Elements.GetDictionary(PdfResources.Keys.Font) ?? new PdfDictionary(Owner);
+                    foreach (var key in extFontList.Elements.Keys)
+                    {
+                        if (!localFontList.Elements.ContainsKey(key))
+                            localFontList.Elements.Add(key, ImportClosure(importedObjectTable, Owner, extFontList.Elements.GetObject(key)));
+                    }
+                    if (!localResources.Elements.ContainsKey(PdfResources.Keys.Font))
+                        localResources.Elements.Add(PdfResources.Keys.Font, localFontList);
+                    if (!ourForm.Elements.ContainsKey(PdfAcroForm.Keys.DR))
+                        ourForm.Elements.Add(PdfAcroForm.Keys.DR, localResources);
+                }
+            }
+
+            for (var f = 0; f < importPage.Owner.AcroForm.Fields.Elements.Count; f++)
+            {
+                var fieldObj = importPage.Owner.AcroForm.Fields[f];
+                ImportAcroField(page, importPage, ourForm, importedObjectTable, fieldObj, false);
+            }
+
+            if (_document.AcroForm == null)
+            {
+                _document._irefTable.Add(ourForm);
+                _document.Catalog.AcroForm = ourForm;
+            }
+        }
+
+        private void ImportAcroField(PdfPage page, PdfPage importPage, PdfAcroForm localForm, PdfImportedObjectTable importedObjectTable, PdfAcroField fieldObj, bool isChild)
+        {
+            if (fieldObj != null)
+            {
+                PdfDictionary importedObject;
+                if (!importedObjectTable.Contains(fieldObj.ObjectID))
+                {
+                    // Do not use PdfObject.DeepCopyClosure as that would also create new Pages when encountering the "/P" Entry  !
+                    importedObject = ImportClosure(importedObjectTable, _document, fieldObj) as PdfDictionary;
+                }
+                else
+                    importedObject = importedObjectTable[fieldObj.ObjectID].Value as PdfDictionary;
+                Debug.Assert(importedObject != null, "Imported AcroField is null");
+                if (importedObject != null)
+                {
+#if DEBUG
+                    var name = importedObject is PdfAcroField ? ((PdfAcroField)importedObject).FullyQualifiedName : "NoName";
+                    Debug.WriteLine(string.Format("Importing {0} '{1}' ({2})", importedObject.GetType().Name, name, importedObject.ObjectID));
+#endif
+                    if (importedObject.Elements.ContainsKey("/P"))
+                    {
+                        var fieldPage = importedObject.Elements.GetObject(PdfAnnotation.Keys.Page);
+#if !DEBUG
+                      if (!document.irefTable.Contains(fieldPage.ObjectID))
+                          throw new PdfSharpException("Error importing Field: Page of imported field should exist in current document. Please report this error along with the document you're working with.");
+#endif
+                        Debug.Assert(_document._irefTable.Contains(fieldPage.ObjectID), "Page of imported field should exist in current document");
+                    }
+                    if (!isChild && !IsInArray(localForm.Fields, importedObject))
+                        localForm.Fields.Elements.Add(importedObject);
+                }
+            }
+        }
+
+        private static bool IsInArray(PdfArray array, PdfObject obj)
+        {
+            for (var i = 0; i < array.Elements.Count; i++)
+            {
+                var ao = array.Elements.GetObject(i);
+                if (obj.IsIndirect)
+                    obj = obj.Reference.Value;
+                if (ReferenceEquals(ao, obj))
+                    return true;
+            }
+            return false;
         }
 
         static PdfReference RemapReference(PdfPage[] newPages, PdfPage[] impPages, PdfReference iref)

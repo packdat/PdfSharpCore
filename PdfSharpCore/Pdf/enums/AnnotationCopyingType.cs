@@ -6,7 +6,7 @@
     public enum AnnotationCopyingType
     {
         /// <summary>
-        /// Skips annotation copying.
+        /// Skips annotation copying. This also skips Acro-Fields.
         /// </summary>
         DoNotCopy,
         /// <summary>

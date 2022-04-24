@@ -443,19 +443,22 @@ namespace PdfSharpCore.Drawing.Pdf
 
             Realize(font, brush, boldSimulation ? 2 : 0);
 
-            switch (format.Alignment)
+            if (!format.Comb)
             {
-                case XStringAlignment.Near:
-                    // nothing to do
-                    break;
+                switch (format.Alignment)
+                {
+                    case XStringAlignment.Near:
+                        // nothing to do
+                        break;
 
-                case XStringAlignment.Center:
-                    x += (rect.Width - width) / 2;
-                    break;
+                    case XStringAlignment.Center:
+                        x += (rect.Width - width) / 2;
+                        break;
 
-                case XStringAlignment.Far:
-                    x += rect.Width - width;
-                    break;
+                    case XStringAlignment.Far:
+                        x += rect.Width - width;
+                        break;
+                }
             }
             if (Gfx.PageDirection == XPageDirection.Downwards)
             {
@@ -510,6 +513,7 @@ namespace PdfSharpCore.Drawing.Pdf
             OpenTypeDescriptor descriptor = realizedFont.FontDescriptor._descriptor;
 
             string text = null;
+            List<string> combStrings = new List<string>();
             if (font.Unicode)
             {
                 StringBuilder sb = new StringBuilder();
@@ -524,6 +528,8 @@ namespace PdfSharpCore.Drawing.Pdf
                     }
                     int glyphID = descriptor.CharCodeToGlyphIndex(ch);
                     sb.Append((char)glyphID);
+                    if (format.Comb)
+                        combStrings.Add(new string((char)glyphID, 1));
                 }
                 s = sb.ToString();
 
@@ -535,6 +541,16 @@ namespace PdfSharpCore.Drawing.Pdf
             {
                 byte[] bytes = PdfEncoders.WinAnsiEncoding.GetBytes(s);
                 text = PdfEncoders.ToStringLiteral(bytes, false, null);
+                if (format.Comb)
+                {
+                    // text is put into parenthesis "()" by PdfEncoders.ToStringLiteral(), skip these
+                    Debug.Assert(text.Length >= 2);
+                    for (var i = 1; i < text.Length - 1; i++)
+                    {
+                        var c = text[i].ToString();
+                        combStrings.Add(c);
+                    }
+                }
             }
 
             // Map absolute position to PDF world space.
@@ -549,44 +565,53 @@ namespace PdfSharpCore.Drawing.Pdf
                 //verticalOffset = font.Size * Const.BoldEmphasis / 2;
             }
 
-#if ITALIC_SIMULATION
-            if (italicSimulation)
+            if (format.Comb)
             {
-                if (_gfxState.ItalicSimulationOn)
-                {
-                    AdjustTdOffset(ref pos, verticalOffset, true);
-                    AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} Td\n{2} Tj\n", pos.X, pos.Y, text);
-                }
-                else
-                {
-                    // Italic simulation is done by skewing characters 20° to the right.
-                    XMatrix m = new XMatrix(1, 0, Const.ItalicSkewAngleSinus, 1, pos.X, pos.Y);
-                    AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} {2:" + format2 + "} {3:" + format2 + "} {4:" + format2 + "} {5:" + format2 + "} Tm\n{6} Tj\n",
-                        m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY, text);
-                    _gfxState.ItalicSimulationOn = true;
-                    AdjustTdOffset(ref pos, verticalOffset, false);
-                }
+                // ignore all simulations when rendering combs
+                RenderCombStrings(combStrings, format, pos, font);
             }
             else
             {
-                if (_gfxState.ItalicSimulationOn)
+#if ITALIC_SIMULATION
+                if (italicSimulation)
                 {
-                    XMatrix m = new XMatrix(1, 0, 0, 1, pos.X, pos.Y);
-                    AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} {2:" + format2 + "} {3:" + format2 + "} {4:" + format2 + "} {5:" + format2 + "} Tm\n{6} Tj\n",
-                        m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY, text);
-                    _gfxState.ItalicSimulationOn = false;
-                    AdjustTdOffset(ref pos, verticalOffset, false);
+                    if (_gfxState.ItalicSimulationOn)
+                    {
+                        AdjustTdOffset(ref pos, verticalOffset, true);
+                        AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} Td\n{2} Tj\n", pos.X, pos.Y, text);
+                    }
+                    else
+                    {
+                        // Italic simulation is done by skewing characters 20° to the right.
+                        XMatrix m = new XMatrix(1, 0, Const.ItalicSkewAngleSinus, 1, pos.X, pos.Y);
+                        AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} {2:" + format2 + "} {3:" + format2 + "} {4:" + format2 + "} {5:" + format2 + "} Tm\n{6} Tj\n",
+                            m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY, text);
+                        _gfxState.ItalicSimulationOn = true;
+                        AdjustTdOffset(ref pos, verticalOffset, false);
+                    }
                 }
                 else
                 {
-                    AdjustTdOffset(ref pos, verticalOffset, false);
-                    AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} Td {2} Tj\n", pos.X, pos.Y, text);
+                    if (_gfxState.ItalicSimulationOn)
+                    {
+                        XMatrix m = new XMatrix(1, 0, 0, 1, pos.X, pos.Y);
+                        AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} {2:" + format2 + "} {3:" + format2 + "} {4:" + format2 + "} {5:" + format2 + "} Tm\n{6} Tj\n",
+                            m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY, text);
+                        _gfxState.ItalicSimulationOn = false;
+                        AdjustTdOffset(ref pos, verticalOffset, false);
+                    }
+                    else
+                    {
+                        AdjustTdOffset(ref pos, verticalOffset, false);
+                        AppendFormatArgs("{0:" + format2 + "} {1:" + format2 + "} Td {2} Tj\n", pos.X, pos.Y, text);
+                    }
                 }
-            }
 #else
                 AdjustTextMatrix(ref pos);
                 AppendFormat2("{0:" + format2 + "} {1:" + format2 + "} Td {2} Tj\n", pos.X, pos.Y, text);
 #endif
+            }
+
             if (underline)
             {
                 double underlinePosition = lineSpace * realizedFont.FontDescriptor._descriptor.UnderlinePosition / font.CellSpace;
@@ -607,6 +632,24 @@ namespace PdfSharpCore.Drawing.Pdf
                     ? y - strikeoutPosition
                     : y + strikeoutPosition - strikeoutSize;
                 DrawRectangle(null, brush, x, strikeoutRectY, width, strikeoutSize);
+            }
+        }
+
+        private void RenderCombStrings(IEnumerable<string> combStrings, XStringFormat format, XPoint pos, XFont font)
+        {
+            const string format2 = Config.SignificantFigures4;
+
+            //pos.X -= font.Size / 1.5;   // TODO: this can't be right...(but looks better than without)
+            foreach (var combstring in combStrings)
+            {
+                var bytes = PdfEncoders.RawUnicodeEncoding.GetBytes(combstring);
+                bytes = PdfEncoders.FormatStringLiteral(bytes, true, false, true, null);
+                var text = PdfEncoders.RawEncoding.GetString(bytes, 0, bytes.Length);
+                var cSize = _gfx.MeasureString(combstring, font);
+                var xOffset = (format.CombWidth - cSize.Width) / 2.0;
+                //var xOffset = -2.0;// format.CombWidth / 10.0;
+                AppendFormatArgs("q {0:" + format2 + "} {1:" + format2 + "} Td {2} Tj Q\n", pos.X + xOffset, pos.Y, text);
+                pos.X += format.CombWidth;
             }
         }
 

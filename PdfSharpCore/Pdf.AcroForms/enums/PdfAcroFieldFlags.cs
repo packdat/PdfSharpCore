@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -114,6 +114,25 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         DoNotScroll = 1 << (24 - 1),
 
+        /// <summary>
+        /// (PDF 1.5) May be set only if the MaxLen entry is present in the text field dictionary (see Table 229) and if the Multiline, Password, and
+        /// FileSelect flags are clear. If set, the field shall be automatically divided into as many equally spaced positions, or combs, as the
+        /// value of MaxLen, and the text is laid out into those combs.
+        /// </summary>
+        Comb = 1 << (25 - 1),
+
+        /// <summary>
+        /// (PDF 1.5) If set, a group of radio buttons within a radio button field that use the same value for the on state will turn on and off in 
+        /// unison; that is if one is checked, they are all checked. If clear, the buttons are mutually exclusive (the same behavior as HTML radio buttons).
+        /// </summary>
+        RadiosInUnison = 1 << (26 - 1),
+
+        /// <summary>
+        /// (PDF 1.5) If set, the value of this field shall be a rich text string (see 12.7.3.4, “Rich Text Strings”).
+        /// If the field has a value, the RV entry of the field dictionary (Table 222) shall specify the rich text string.
+        /// </summary>
+        RichText = 1 << (26 - 1),
+
         // ----- Specific to choice fields ------------------------------------------------------------
 
         /// <summary>
@@ -147,5 +166,16 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// This flag is meaningful only if the Combo and Edit flags are both set.
         /// </summary>
         DoNotSpellCheckChoiseField = 1 << (23 - 1),
+
+        /// <summary>
+        /// (PDF 1.5) If set, the new value shall be committed as soon as a selection is made (commonly with the pointing device). In this 
+        /// case, supplying a value for a field involves three actions: selecting the field for fill-in, selecting a choice for the fill-in 
+        /// value, and leaving that field, which finalizes or “commits” the data choice and triggers any actions associated with the entry 
+        /// or changing of this data. If this flag is on, then processing does not wait for leaving the field action to occur, but immediately 
+        /// proceeds to the third step.
+        /// This option enables applications to perform an action once a 
+        /// selection is made, without requiring the user to exit the field. If clear, the new value is not committed until the user exits the field.
+        /// </summary>
+        CommitOnSelChange = 1 << (27 - 1),
     }
 }

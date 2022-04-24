@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,10 +27,13 @@
 // DEALINGS IN THE SOFTWARE.
 #endregion
 
+using PdfSharpCore.Pdf.Annotations;
+using System;
+
 namespace PdfSharpCore.Pdf.AcroForms
 {
     /// <summary>
-    /// Represents a generic field. Used for AcroForm dictionaries unknown to PdfSharpCore.
+    /// Represents a generic field. Used for AcroForm dictionaries unknown to PDFsharp.
     /// </summary>
     public sealed class PdfGenericField : PdfAcroField
     {
@@ -38,12 +41,30 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// Initializes a new instance of PdfGenericField.
         /// </summary>
         internal PdfGenericField(PdfDocument document)
-            : base(document)
+                : base(document)
         { }
 
         internal PdfGenericField(PdfDictionary dict)
-            : base(dict)
+                : base(dict)
         { }
+
+        internal override void Flatten()
+        {
+            base.Flatten();
+
+            for (var i = 0; i < Annotations.Elements.Count; i++)
+            {
+                var widget = Annotations.Elements[i];
+                if (widget.Page != null)
+                {
+                    var appearances = widget.Elements.GetDictionary(PdfAnnotation.Keys.AP);
+                    var normalAppearance = appearances != null ? appearances.Elements.GetDictionary("/N") : null;
+                    var activeAppearance = widget.Elements.GetString(PdfAnnotation.Keys.AS);
+                    if (!String.IsNullOrEmpty(activeAppearance) && normalAppearance != null && normalAppearance.Elements.ContainsKey(activeAppearance))
+                        RenderContentStream(widget.Page, normalAppearance.Elements.GetDictionary(activeAppearance).Stream, widget.Rectangle);
+                }
+            }
+        }
 
         /// <summary>
         /// Predefined keys of this dictionary. 

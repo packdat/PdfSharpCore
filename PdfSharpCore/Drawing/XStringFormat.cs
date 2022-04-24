@@ -145,6 +145,16 @@ namespace PdfSharpCore.Drawing
         }
         XLineAlignment _lineAlignment;
 
+        /// <summary>
+        /// Support PdfAcroFieldFlags.Comb
+        /// </summary>
+        public bool Comb { get; set; }
+
+        /// <summary>
+        /// Width of a single comb for the output-string
+        /// </summary>
+        public double CombWidth { get; set; }
+
 #if GDI
         //#if UseGdiObjects
         internal StringFormat RealizeGdiStringFormat()

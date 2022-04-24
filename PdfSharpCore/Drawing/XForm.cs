@@ -42,6 +42,7 @@ using PdfSharpCore.Drawing.Pdf;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Pdf.Advanced;
 using PdfSharpCore.Pdf.Filters;
+using PdfSharpCore.Pdf.Internal;
 
 namespace PdfSharpCore.Drawing
 {
@@ -417,6 +418,8 @@ namespace PdfSharpCore.Drawing
             Debug.Assert(IsTemplate, "This function is for form templates only.");
             pdfFont = _document.FontTable.GetFont(font);
             Debug.Assert(pdfFont != null);
+            if (font.FromDocument && !string.IsNullOrEmpty(font.DocumentFontName))
+                return font.DocumentFontName;
             string name = Resources.AddFont(pdfFont);
             return name;
         }

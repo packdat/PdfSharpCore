@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
 // DEALINGS IN THE SOFTWARE.
 #endregion
+
+using PdfSharpCore.Pdf.Advanced;
 
 namespace PdfSharpCore.Pdf.AcroForms
 {
@@ -63,7 +65,54 @@ namespace PdfSharpCore.Pdf.AcroForms
                 return _fields;
             }
         }
-        PdfAcroField.PdfAcroFieldCollection _fields;
+        private PdfAcroField.PdfAcroFieldCollection _fields;
+
+        internal PdfResources Resources
+        {
+            get
+            {
+                if (this.resources == null)
+                    this.resources = (PdfResources)Elements.GetValue(PdfAcroForm.Keys.DR, VCF.None);
+                return this.resources;
+            }
+        }
+        PdfResources resources;
+
+
+        internal override void PrepareForSave()
+        {
+            // Need to create "Fields" Entry after importing fields from external documents
+            if (_fields != null && _fields.Elements.Count > 0 && !Elements.ContainsKey(Keys.Fields))
+            {
+                Elements.Add(Keys.Fields, _fields);
+            }
+			// do not use the Fields-Property, as that may create new unwanted fields !
+            var fieldsArray = Elements.GetArray(Keys.Fields);
+            if (fieldsArray != null)
+            {
+                for (var i = 0; i < fieldsArray.Elements.Count; i++)
+                {
+                    var field = fieldsArray.Elements[i] as PdfReference;
+                    if (field != null && field.Value != null)
+                        field.Value.PrepareForSave();
+                }
+            }
+            base.PrepareForSave();
+        }
+
+        /// <summary>
+        /// Flattens the AcroForm by rendering Field-contents directly onto the page
+        /// </summary>
+        public void Flatten()
+        {
+            for (var i = 0; i < Fields.Elements.Count; i++)
+            {
+                var field = Fields[i];
+                field.Flatten();
+            }
+            _document.Catalog.AcroForm = null;
+        }
+
 
         /// <summary>
         /// Predefined keys of this dictionary. 
@@ -108,7 +157,7 @@ namespace PdfSharpCore.Pdf.AcroForms
             /// <summary>
             /// (Optional) A document-wide default value for the DR attribute of variable text fields.
             /// </summary>
-            [KeyInfo(KeyType.Dictionary | KeyType.Optional)]
+            [KeyInfo(KeyType.Dictionary | KeyType.Optional, typeof(PdfResources))]
             public const string DR = "/DR";
 
             /// <summary>

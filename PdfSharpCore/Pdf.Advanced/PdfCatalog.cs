@@ -166,6 +166,22 @@ namespace PdfSharpCore.Pdf.Advanced
                     _acroForm = (PdfAcroForm)Elements.GetValue(Keys.AcroForm);
                 return _acroForm;
             }
+            internal set
+            {
+                if (value != null)
+                {
+                    if (!value.IsIndirect)
+                        throw new InvalidOperationException("Setting the AcroForm requires an indirect object");
+                    Elements.SetReference(Keys.AcroForm, value);
+                }
+                else
+                {
+                    if (_acroForm != null && _acroForm.Reference != null)
+                        _document._irefTable.Remove(_acroForm.Reference);
+                    Elements.Remove(Keys.AcroForm);
+                }
+                _acroForm = value;
+            }
         }
         PdfAcroForm _acroForm;
 
@@ -199,6 +215,8 @@ namespace PdfSharpCore.Pdf.Advanced
                     PageMode = PdfPageMode.UseOutlines;
                 _outline.PrepareForSave();
             }
+            if (_acroForm != null)
+                _acroForm.PrepareForSave();
         }
 
         internal override void WriteObject(PdfWriter writer)

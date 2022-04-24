@@ -509,6 +509,18 @@ namespace PdfSharpCore.Drawing
         }
 
         /// <summary>
+        /// Indicates, whether this font was created from an existing document.<br></br>
+        /// Intended to avoid unnecessary adding of new Fonts to the document when filling AcroForms.
+        /// </summary>
+        internal bool FromDocument { get; set; }
+
+        /// <summary>
+        /// Gets or sets the name this Font is referenced by in an existing document
+        /// </summary>
+        internal string DocumentFontName { get; set; }
+
+
+        /// <summary>
         /// Gets the em-size of this font measured in the unit of this font object.
         /// </summary>
         public double Size

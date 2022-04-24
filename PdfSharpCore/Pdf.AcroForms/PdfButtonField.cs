@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -30,6 +30,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using PdfSharpCore.Pdf.Annotations;
 
 namespace PdfSharpCore.Pdf.AcroForms
@@ -61,15 +62,44 @@ namespace PdfSharpCore.Pdf.AcroForms
             // Try to get the information from the appearance dictionaray.
             // Just return the first key that is not /Off.
             // I'm not sure what is the right solution to get this value.
-            PdfDictionary ap = Elements[PdfAnnotation.Keys.AP] as PdfDictionary;
-            if (ap != null)
+            if (Annotations.Elements.Count > 0)
             {
-                PdfDictionary n = ap.Elements["/N"] as PdfDictionary;
-                if (n != null)
+                var widget = Annotations.Elements[0];
+                if (widget != null)
                 {
-                    foreach (string name in n.Elements.Keys)
-                        if (name != "/Off")
-                            return name;
+                    var ap = widget.Elements.GetDictionary(PdfAnnotation.Keys.AP);
+                    if (ap != null)
+                    {
+                        var n = ap.Elements.GetDictionary("/N");
+                        if (n != null)
+                        {
+                            foreach (string name in n.Elements.Keys)
+                                if (name != "/Off")
+                                    return name;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the name which represents the opposite of /Off for the specified widget.
+        /// </summary>
+        /// <param name="widget"></param>
+        /// <returns></returns>
+        protected string GetNonOffValue(PdfWidgetAnnotation widget)
+        {
+            if (widget != null)
+            {
+                var ap = widget.Elements.GetDictionary(PdfAnnotation.Keys.AP);
+                if (ap != null)
+                {
+                    var n = ap.Elements.GetDictionary("/N");
+                    if (n != null)
+                    {
+                        return n.Elements.Keys.FirstOrDefault(name => name != "/Off");
+                    }
                 }
             }
             return null;
@@ -88,6 +118,42 @@ namespace PdfSharpCore.Pdf.AcroForms
                     names.Add(partialName + "." + t);
                 else
                     names.Add(t);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to determine the visual appearance for this AcroField
+        /// </summary>
+        protected internal override void DetermineAppearance()
+        {
+            base.DetermineAppearance();
+            if (!string.IsNullOrEmpty(ContentFontName) && DeterminedFontSize > 0.0)
+                return;
+            for (var i = 0; i < Annotations.Elements.Count; i++)
+            {
+                var widget = Annotations.Elements[i];
+                if (widget.Page != null)
+                {
+                    var appearance = widget.Elements.GetDictionary(PdfAnnotation.Keys.AP);
+                    if (appearance != null)
+                    {
+                        // /N -> Normal appearance, /R -> Rollover appearance, /D -> Down appearance
+                        var apps = appearance.Elements.GetDictionary("/N");
+                        if (apps != null)
+                        {
+                            var appSel = apps.Elements.GetDictionary(GetNonOffValue());
+                            if (appSel != null)
+                            {
+                                try
+                                {
+                                    DetermineFontFromContent(appSel.Stream.UnfilteredValue);
+                                }
+                                catch
+                                { }
+                            }
+                        }
+                    }
+                }
             }
         }
 

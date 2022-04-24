@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,6 +27,10 @@
 // DEALINGS IN THE SOFTWARE.
 #endregion
 
+using PdfSharpCore.Drawing;
+using PdfSharpCore.Pdf.AcroForms.enums;
+using PdfSharpCore.Pdf.Annotations;
+using PdfSharpCore.Pdf.Internal;
 using System;
 
 namespace PdfSharpCore.Pdf.AcroForms
@@ -48,57 +52,125 @@ namespace PdfSharpCore.Pdf.AcroForms
         { }
 
         /// <summary>
-        /// Gets or sets the index of the selected item.
+        /// Gets or sets the index of the selected item
         /// </summary>
         public int SelectedIndex
         {
             get
             {
-                string value = Elements.GetString(Keys.V);
-                return IndexInOptArray(value);
+                string value = Elements.GetString(PdfAcroField.Keys.V);
+                // try export value first
+                var index = IndexInOptArray(value, true);
+                if (index < 0)
+                    index = IndexInOptArray(value, false);
+                return index;
             }
             set
             {
-                // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx		  
-                if (value != -1) //R080325
-                {
-                    string key = ValueInOptArray(value);
-                    Elements.SetString(Keys.V, key);
-                    Elements.SetInteger("/I", value); //R080304 !!!!!!! sonst reagiert die Combobox überhaupt nicht !!!!!
-                }
+                string key = ValueInOptArray(value, true);
+                Elements.SetString(PdfAcroField.Keys.V, key);
             }
         }
 
         /// <summary>
-        /// Gets or sets the value of the field.
+        /// Gets or sets the value for this field
         /// </summary>
-        // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx		  
-        public override PdfItem Value //R080304
+        public override PdfItem Value
         {
-            get { return Elements[Keys.V]; }
-            set
+            get { return base.Value; }
+            set { base.Value = value; }
+        }
+
+        void RenderAppearance()
+        {
+            for (var i = 0; i < Annotations.Elements.Count; i++)
             {
-                if (ReadOnly)
-                    throw new InvalidOperationException("The field is read only.");
-                if (value is PdfString || value is PdfName)
+                var widget = Annotations.Elements[i];
+                if (widget == null)
+                    continue;
+
+                var rect = widget.Rectangle;
+                if (rect.IsEmpty)
+                    continue;
+
+                // ensure a minimum size of 1x1, otherwise an exception is thrown
+                var xRect = new XRect(0, 0, Math.Max(DeterminedFontSize, Math.Max(1.0, rect.Width)), Math.Max(DeterminedFontSize, Math.Max(1.0, rect.Height)));
+                var form = new XForm(_document, xRect);
+                using (var gfx = XGraphics.FromForm(form))
                 {
-                    Elements[Keys.V] = value;
-                    SelectedIndex = SelectedIndex; //R080304 !!!
-                    if (SelectedIndex == -1)
+                    if (widget.BackColor != XColor.Empty)
+                        gfx.DrawRectangle(new XSolidBrush(widget.BackColor), xRect);
+                    // Draw Border
+                    if (!widget.BorderColor.IsEmpty)
+                        gfx.DrawRectangle(new XPen(widget.BorderColor), xRect);
+
+                    var index = SelectedIndex;
+                    if (index > 0)
                     {
-                        //R080317 noch nicht rund
-                        try
+                        var text = ValueInOptArray(index, false);
+                        if (!String.IsNullOrEmpty(text))
                         {
-                            //anhängen
-                            ((PdfArray)(((PdfItem[])(Elements.Values))[2])).Elements.Add(Value);
-                            SelectedIndex = SelectedIndex;
+                            var format = TextAlign == TextAlignment.Left ? XStringFormats.CenterLeft : TextAlign == TextAlignment.Center ? XStringFormats.Center : XStringFormats.CenterRight;
+                            gfx.DrawString(text, Font, new XSolidBrush(ForeColor), xRect, format);
                         }
-                        catch { }
                     }
                 }
-                else
-                    throw new NotImplementedException("Values other than string cannot be set.");
+                form.DrawingFinished();
+
+                SetXFormFont(form);
+
+                var ap = new PdfDictionary(this._document);
+                widget.Elements[PdfAnnotation.Keys.AP] = ap;
+                widget.Elements.SetName(PdfAnnotation.Keys.AS, "/N");   // set appearance state
+                // Set XRef to normal state
+                ap.Elements["/N"] = form.PdfForm.Reference;
+
+                var xobj = form.PdfForm;
+                var s = xobj.Stream.ToString();
+                s = "/Tx BMC\n" + s + "\nEMC";
+                xobj.Stream.Value = new RawEncoding().GetBytes(s);
             }
+        }
+
+        internal override void Flatten()
+        {
+            base.Flatten();
+
+            var index = SelectedIndex;
+            if (index >= 0)
+            {
+                var text = ValueInOptArray(index, false);
+                if (text.Length > 0)
+                {
+                    for (var i = 0; i < Annotations.Elements.Count; i++)
+                    {
+                        var widget = Annotations.Elements[i];
+                        if (widget.Page != null)
+                        {
+                            var rect = widget.Rectangle;
+                            if (!rect.IsEmpty)
+                            {
+                                var format = TextAlign == TextAlignment.Left ? XStringFormats.CenterLeft : TextAlign == TextAlignment.Center ? XStringFormats.Center : XStringFormats.CenterRight;
+                                var xRect = new XRect(rect.X1, widget.Page.Height.Point - rect.Y2, rect.Width, rect.Height);
+                                using (var gfx = XGraphics.FromPdfPage(widget.Page))
+                                {
+                                    gfx.Save();
+                                    gfx.IntersectClip(xRect);
+                                    // Note: Page origin [0,0] is bottom left !
+                                    gfx.DrawString(text, Font, new XSolidBrush(ForeColor), xRect, format);
+                                    gfx.Restore();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        internal override void PrepareForSave()
+        {
+            base.PrepareForSave();
+            RenderAppearance();
         }
 
         /// <summary>

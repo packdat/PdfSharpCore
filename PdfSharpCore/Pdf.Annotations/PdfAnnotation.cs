@@ -106,6 +106,28 @@ namespace PdfSharpCore.Pdf.Annotations
         }
 
         /// <summary>
+        /// Gets or sets the page for this Annotation
+        /// </summary>
+        public PdfPage Page
+        {
+            get
+            {
+                var pageRef = Elements.GetReference(Keys.Page);
+                if (pageRef == null)
+                {
+                    var page = TryFindPage();
+                    if (page != null)
+                    {
+                        Elements.SetReference(Keys.Page, page);
+                        pageRef = page.Reference;
+                    }
+                }
+                return pageRef != null && pageRef.Value is PdfDictionary ? pageRef.Value as PdfPage ?? new PdfPage((PdfDictionary)pageRef.Value) : null;
+            }
+            set { Elements.SetReference(Keys.Page, value); }
+        }
+
+        /// <summary>
         /// Gets or sets the text label to be displayed in the title bar of the annotation’s
         /// pop-up window when open and active. By convention, this entry identifies
         /// the user who added the annotation.
@@ -206,6 +228,36 @@ namespace PdfSharpCore.Pdf.Annotations
         }
 
         /// <summary>
+        /// The integer key of the annotation’s entry in the structural parent tree
+        /// </summary>
+        public int StructParent
+        {
+            get { return Elements.GetInteger(Keys.StructParent); }
+            set { Elements.SetInteger(Keys.StructParent, value); }
+        }
+
+        private PdfPage TryFindPage()
+        {
+            if (_document != null)
+            {
+                for (var i = 0; i < _document.PageCount; i++)
+                {
+                    var page = _document.Pages[i];
+                    if (page.Annotations != null && page.Annotations.Count > 0)
+                    {
+                        for (var a = 0; a < page.Annotations.Count; a++)
+                        {
+                            var annot = page.Annotations[a];
+                            if (annot.Reference == Reference)
+                                return page;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Predefined keys of this dictionary.
         /// </summary>
         public class Keys : KeysBase
@@ -242,7 +294,14 @@ namespace PdfSharpCore.Pdf.Annotations
             [KeyInfo(KeyType.TextString | KeyType.Optional)]
             public const string Contents = "/Contents";
 
-            // P
+            /// <summary>
+            /// (Optional except as noted below; PDF 1.3; not used in FDF files) 
+            /// An indirect reference to the page object with which this annotation is associated.
+            /// This entry shall be present in screen annotations associated with rendition actions 
+            /// (PDF 1.5; see 12.5.6.18, “Screen Annotations” and 12.6.4.13, “Rendition Actions”)
+            /// </summary>
+            [KeyInfo(KeyType = KeyType.Optional)]
+            public const string Page = "/P";
 
             /// <summary>
             /// (Optional; PDF 1.4) The annotation name, a text string uniquely identifying it
@@ -266,10 +325,11 @@ namespace PdfSharpCore.Pdf.Annotations
             [KeyInfo("1.1", KeyType.Integer | KeyType.Optional)]
             public const string F = "/F";
 
-            /// <summary>
-            /// (Optional; PDF 1.2) A border style dictionary specifying the characteristics of
-            /// the annotation’s border.
-            /// </summary>
+            /// (PDF 1.2) The dictionaries for some annotation types (such 
+            /// as free text and polygon annotations) can include the BS entry.
+            /// That entry specifies a border style dictionary that has
+            /// more settings than the array specified for the Border entry.
+            /// If an annotation dictionary includes the BS entry, then the Border entry is ignored
             [KeyInfo("1.2", KeyType.Dictionary | KeyType.Optional)]
             public const string BS = "/BS";
 
@@ -325,6 +385,14 @@ namespace PdfSharpCore.Pdf.Annotations
             /// </summary>
             [KeyInfo("1.1", KeyType.Dictionary | KeyType.Optional)]
             public const string A = "/A";
+
+            /// <summary>
+            /// (Required if the annotation is a structural content item; PDF 1.3) 
+            /// The integer key of the annotation’s entry in the structural parent tree
+            /// (see 14.7.4.4, “Finding Structure Elements from Content Items”).
+            /// </summary>
+            [KeyInfo("1.1", KeyType.Integer | KeyType.Optional)]
+            public const string StructParent = "/StructParent";
 
             // AA
             // StructParent

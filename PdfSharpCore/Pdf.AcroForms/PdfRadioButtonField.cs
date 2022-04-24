@@ -1,11 +1,11 @@
 #region PDFsharp - A .NET library for processing PDF
 //
 // Authors:
-//   Stefan Lange
+//   Stefan Lange (mailto:Stefan.Lange@pdfsharp.com)
 //
 // Copyright (c) 2005-2016 empira Software GmbH, Cologne Area (Germany)
 //
-// http://www.PdfSharpCore.com
+// http://www.pdfsharp.com
 // http://sourceforge.net/projects/pdfsharp
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,7 +27,10 @@
 // DEALINGS IN THE SOFTWARE.
 #endregion
 
+using PdfSharpCore.Pdf.Annotations;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PdfSharpCore.Pdf.AcroForms
 {
@@ -47,52 +50,158 @@ namespace PdfSharpCore.Pdf.AcroForms
 
         internal PdfRadioButtonField(PdfDictionary dict)
             : base(dict)
-        { }
+        {
+            if (!Elements.ContainsKey(Keys.Opt))
+            {
+                var array = new PdfArray(_document);
+                foreach (var val in Options)
+                    array.Elements.Add(new PdfName(val));
+                Elements.Add(Keys.Opt, array);
+            }
+        }
 
         /// <summary>
-        /// Gets or sets the index of the selected radio button in a radio button group.
+        /// Gets or sets the value of this field. This should be an item from the <see cref="Options"/> list.
+        /// </summary>
+        public new string Value
+        {
+            get { return base.Value.ToString(); }
+            set
+            {
+                base.Value = new PdfString(value);
+                var index = IndexInFieldValues(value);
+                SelectedIndex = index;
+            }
+        }
+
+        private IList<string> options;
+
+        /// <summary>
+        /// Gets the option-names of this RadioButton<br></br>
+        /// Use one of these values when setting <see cref="Value"/>
+        /// </summary>
+        public ICollection<string> Options
+        {
+            get
+            {
+                if (options != null)
+                    return options;
+
+                var values = new List<string>();
+                for (var i = 0; i < Annotations.Elements.Count; i++)
+                {
+                    var widget = Annotations.Elements[i];
+                    if (widget == null)
+                        continue;
+
+                    values.Add(GetNonOffValue(widget));
+                }
+                options = values;
+                return options;
+            }
+        }
+
+        /// <summary>
+        /// Gets the (optional) export-values for each entry in this radio button group.<br></br>
+        /// If the field does not specify these, <b><see cref="Options"/></b> is returned.
+        /// </summary>
+        public ICollection<string> ExportValues
+        {
+            get
+            {
+                var opt = Elements.GetArray(Keys.Opt);
+                if (opt != null)
+                {
+                    var list = new List<string>();
+                    for (var i =0; i < opt.Elements.Count; i++)
+                        list.Add(opt.Elements.GetString(i));
+                    return list;
+                }
+                return Options;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the index of the selected radio button in a radio button group.<br></br>
+        /// This is an alternative to the <see cref="Value"/>
         /// </summary>
         public int SelectedIndex
         {
             get
             {
-                string value = Elements.GetString(Keys.V);
-                return IndexInOptStrings(value);
+                var value = Elements.GetString(PdfAcroField.Keys.V);
+                return IndexInFieldValues(value);
             }
             set
             {
-                PdfArray opt = Elements[Keys.Opt] as PdfArray;
-
-                if (opt == null)
-                    opt = Elements[Keys.Kids] as PdfArray;
-
-                if (opt != null)
+                var values = Options;
+                var count = values.Count;
+                if (value < -1 || value >= count)
+                    throw new ArgumentOutOfRangeException("value");
+                var name = value == -1 ? "/Off" : values.ElementAt(value);
+                Elements.SetName(PdfAcroField.Keys.V, name);
+                // first, set all annotations to /Off
+                for (var i = 0; i < Annotations.Elements.Count; i++)
                 {
-                    int count = opt.Elements.Count;
-                    if (value < 0 || value >= count)
-                        throw new ArgumentOutOfRangeException("value");
-                    Elements.SetName(Keys.V, opt.Elements[value].ToString());
+                    var widget = Annotations.Elements[i];
+                    if (widget != null)
+                        widget.Elements.SetName(PdfAnnotation.Keys.AS, "/Off");
+                }
+                if ((Flags & PdfAcroFieldFlags.RadiosInUnison) != 0)
+                {
+                    // Then set all Widgets with the same Appearance to the checked state
+                    for (var i = 0; i < Annotations.Elements.Count; i++)
+                    {
+                        var widget = Annotations.Elements[i];
+                        if (name == values.ElementAt(i) && widget != null)
+                            widget.Elements.SetName(PdfAnnotation.Keys.AS, name);
+                    }
+                }
+                else
+                {
+                    if (value >= 0 && value < Annotations.Elements.Count)
+                    {
+                        var widget = Annotations.Elements[value];
+                        if (widget != null)
+                        {
+                            widget.Elements.SetName(PdfAnnotation.Keys.AS, name);
+                        }
+                    }
                 }
             }
         }
 
-        int IndexInOptStrings(string value)
+        private int IndexInFieldValues(string value)
         {
-            PdfArray opt = Elements[Keys.Opt] as PdfArray;
-            if (opt != null)
+            return Options.ToList().IndexOf(value);
+        }
+
+        internal override void Flatten()
+        {
+            base.Flatten();
+
+            for (var i = 0; i < Annotations.Elements.Count; i++)
             {
-                int count = opt.Elements.Count;
-                for (int idx = 0; idx < count; idx++)
+                var widget = Annotations.Elements[i];
+                if (widget.Page != null)
                 {
-                    PdfItem item = opt.Elements[idx];
-                    if (item is PdfString)
+                    var appearance = widget.Elements.GetDictionary(PdfAnnotation.Keys.AP);
+                    var selectedAppearance = widget.Elements.GetName(PdfAnnotation.Keys.AS);
+                    if (appearance != null && selectedAppearance != null)
                     {
-                        if (item.ToString() == value)
-                            return idx;
+                        // /N -> Normal appearance, /R -> Rollover appearance, /D -> Down appearance
+                        var apps = appearance.Elements.GetDictionary("/N");
+                        if (apps != null)
+                        {
+                            var appSel = apps.Elements.GetDictionary(selectedAppearance);
+                            if (appSel != null)
+                            {
+                                RenderContentStream(widget.Page, appSel.Stream, widget.Rectangle);
+                            }
+                        }
                     }
                 }
             }
-            return -1;
         }
 
         /// <summary>

@@ -214,6 +214,18 @@ namespace PdfSharpCore.Drawing.Layout
                 {
                     inNonWhiteSpace = true;
                     blockLength++;
+                    // Force line-break if text exceeds max-width and whitespaces are missing
+                    var token = _text.Substring(startIndex, blockLength);
+                    var width = _gfx.MeasureString(token, _font).Width;
+                    if (width >= _layoutRectangle.Width)
+                    {
+                        // strip last char
+                        token = token.Substring(0, token.Length - 1);
+                        _blocks.Add(new Block(token, BlockType.Text, width));
+                        startIndex = idx;
+                        blockLength = 0;
+                        idx--;    // process current char again (was cut off)
+                    }
                 }
             }
             if (blockLength != 0)
