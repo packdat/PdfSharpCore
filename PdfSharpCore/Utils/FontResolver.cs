@@ -53,7 +53,19 @@ namespace PdfSharpCore.Utils
             if (isWindows)
             {
                 fontDir = System.Environment.ExpandEnvironmentVariables(@"%SystemRoot%\Fonts");
-                SSupportedFonts = System.IO.Directory.GetFiles(fontDir, "*.ttf", System.IO.SearchOption.AllDirectories);
+                var fontPaths = new List<string>();
+
+                var systemFontPaths = System.IO.Directory.GetFiles(fontDir, "*.ttf", System.IO.SearchOption.AllDirectories);
+                fontPaths.AddRange(systemFontPaths);
+
+                var appdataFontDir = System.Environment.ExpandEnvironmentVariables(@"%LOCALAPPDATA%\Microsoft\Windows\Fonts");
+                if(System.IO.Directory.Exists(appdataFontDir))
+                {
+                    var appdataFontPaths = System.IO.Directory.GetFiles(appdataFontDir, "*.ttf", System.IO.SearchOption.AllDirectories);
+                    fontPaths.AddRange(appdataFontPaths);
+                }
+
+                SSupportedFonts = fontPaths.ToArray();
                 SetupFontsFiles(SSupportedFonts);
                 return;
             }
@@ -153,7 +165,7 @@ namespace PdfSharpCore.Utils
             return font;
         }
 
-        public byte[] GetFont(string faceFileName)
+        public virtual byte[] GetFont(string faceFileName)
         {
             using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
             {

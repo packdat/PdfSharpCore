@@ -1,4 +1,5 @@
 #region PDFsharp - A .NET library for processing PDF
+
 //
 // Authors:
 //   Stefan Lange
@@ -25,6 +26,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
 // DEALINGS IN THE SOFTWARE.
+
 #endregion
 
 using System;
@@ -35,7 +37,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
+namespace PdfSharpCore.Pdf.Content.Objects // TODO: split into single files
 {
     /// <summary>
     /// Base class for all PDF content stream objects.
@@ -46,7 +48,8 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
         /// Initializes a new instance of the <see cref="CObject"/> class.
         /// </summary>
         protected CObject()
-        { }
+        {
+        }
 
         /// <summary>
         /// Creates a new object that is a copy of the current instance.
@@ -109,6 +112,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return _text; }
             set { _text = value; }
         }
+
         string _text;
 
         /// <summary>
@@ -129,7 +133,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
     /// Represents a sequence of objects in a PDF content stream.
     /// </summary>
     [DebuggerDisplay("(count={Count})")]
-    public class CSequence : CObject, IList<CObject>  // , ICollection<CObject>, IEnumerable<CObject>
+    public class CSequence : CObject, IList<CObject> // , ICollection<CObject>, IEnumerable<CObject>
     {
         /// <summary>
         /// Creates a new object that is a copy of the current instance.
@@ -250,6 +254,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return (CObject)_items[index]; }
             set { _items[index] = value; }
         }
+
         #endregion
 
         #region ICollection Members
@@ -315,11 +320,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             int count = (int)stream.Length;
             byte[] bytes = new byte[count];
             stream.Read(bytes, 0, count);
-#if !UWP && !PORTABLE
-            stream.Close();
-#else
             stream.Dispose();
-#endif
             return bytes;
         }
 
@@ -366,14 +367,8 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
 
         CObject IList<CObject>.this[int index]
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
-            set
-            {
-                throw new NotImplementedException();
-            }
+            get { throw new NotImplementedException(); }
+            set { throw new NotImplementedException(); }
         }
 
         #endregion
@@ -488,6 +483,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return _value; }
             set { _value = value; }
         }
+
         int _value;
 
         /// <summary>
@@ -535,6 +531,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return _value; }
             set { _value = value; }
         }
+
         double _value;
 
         /// <summary>
@@ -615,6 +612,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return _value; }
             set { _value = value; }
         }
+
         string _value;
 
         /// <summary>
@@ -625,6 +623,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
             get { return _cStringType; }
             set { _cStringType = value; }
         }
+
         CStringType _cStringType;
 
         /// <summary>
@@ -691,6 +690,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
                                 break;
                         }
                     }
+
                     s.Append(')');
                     break;
 
@@ -714,6 +714,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
                 default:
                     throw new ArgumentOutOfRangeException();
             }
+
             return s.ToString();
         }
 
@@ -729,12 +730,14 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
     [DebuggerDisplay("({Name})")]
     public class CName : CObject
     {
+        private const string NamePrefix = "/";
+
         /// <summary>
         /// Initializes a new instance of the <see cref="CName"/> class.
         /// </summary>
         public CName()
         {
-            _name = "/";
+            _name = NamePrefix;
         }
 
         /// <summary>
@@ -764,21 +767,24 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
         }
 
         /// <summary>
-        /// Gets or sets the name. Names must start with a slash.
+        /// Gets or sets the content stream name. Names must start with a slash.
         /// </summary>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException">If <paramref name="value"/> does not start with a forward slash</exception>
         public string Name
         {
-            get { return _name; }
+            get => _name;
             set
             {
-                if (String.IsNullOrEmpty(_name))
-                    throw new ArgumentNullException("name");
-                if (_name[0] != '/')
-                    throw new ArgumentException(PSSR.NameMustStartWithSlash);
+                if (string.IsNullOrEmpty(value))
+                    throw new ArgumentNullException(nameof(value));
+                if (!value.StartsWith(NamePrefix))
+                    throw new ArgumentException(PSSR.NameMustStartWithSlash, nameof(value));
                 _name = value;
             }
         }
-        string _name;
+
+        private string _name;
 
         /// <summary>
         /// Returns a string that represents the current value.
@@ -841,7 +847,8 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
         /// Initializes a new instance of the <see cref="COperator"/> class.
         /// </summary>
         protected COperator()
-        { }
+        {
+        }
 
         internal COperator(OpCode opcode)
         {
@@ -882,6 +889,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
         {
             get { return _seqence ?? (_seqence = new CSequence()); }
         }
+
         CSequence _seqence;
 
         /// <summary>
@@ -891,6 +899,7 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
         {
             get { return _opcode; }
         }
+
         readonly OpCode _opcode;
 
 
@@ -907,12 +916,13 @@ namespace PdfSharpCore.Pdf.Content.Objects  // TODO: split into single files
 
         internal override void WriteObject(ContentWriter writer)
         {
-            int count = _seqence != null ? _seqence.Count : 0;
+            int count = _seqence?.Count ?? 0;
             for (int idx = 0; idx < count; idx++)
             {
                 // ReSharper disable once PossibleNullReferenceException because the loop is not entered if _sequence is null
                 _seqence[idx].WriteObject(writer);
             }
+
             writer.WriteLineRaw(ToString());
         }
     }

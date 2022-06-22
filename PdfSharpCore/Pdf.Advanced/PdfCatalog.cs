@@ -160,11 +160,13 @@ namespace PdfSharpCore.Pdf.Advanced
         /// </summary>
         public PdfAcroForm AcroForm
         {
-            get
+            get { return (PdfAcroForm)Elements.GetValue(Keys.AcroForm); }
+            set
             {
-                if (_acroForm == null)
-                    _acroForm = (PdfAcroForm)Elements.GetValue(Keys.AcroForm);
-                return _acroForm;
+                if (Elements.ContainsKey(Keys.AcroForm))
+                    Elements[Keys.AcroForm] = value;
+                else
+                    Elements.Add(Keys.AcroForm, value);
             }
             internal set
             {
@@ -183,7 +185,6 @@ namespace PdfSharpCore.Pdf.Advanced
                 _acroForm = value;
             }
         }
-        PdfAcroForm _acroForm;
 
         /// <summary>
         /// Gets or sets the language identifier specifying the natural language for all text in the document.
