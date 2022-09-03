@@ -125,7 +125,6 @@ namespace PdfSharpCore.Drawing  // #??? aufräumen
         {
             if (size == null)
                 throw new ArgumentNullException("size");
-            
 
             _gsStack = new GraphicsStateStack(this);
             _pageSizePoints = new XSize(size.Width, size.Height);
