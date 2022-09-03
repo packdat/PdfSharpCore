@@ -591,7 +591,7 @@ namespace PdfSharpCore.Pdf
                     {
                         var fieldPage = importedObject.Elements.GetObject(PdfAnnotation.Keys.Page);
 #if !DEBUG
-                      if (!document.irefTable.Contains(fieldPage.ObjectID))
+                      if (!_document._irefTable.Contains(fieldPage.ObjectID))
                           throw new PdfSharpException("Error importing Field: Page of imported field should exist in current document. Please report this error along with the document you're working with.");
 #endif
                         Debug.Assert(_document._irefTable.Contains(fieldPage.ObjectID), "Page of imported field should exist in current document");
