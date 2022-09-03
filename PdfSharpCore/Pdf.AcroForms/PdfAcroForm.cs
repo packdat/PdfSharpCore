@@ -28,6 +28,7 @@
 #endregion
 
 using PdfSharpCore.Pdf.Advanced;
+using System;
 
 namespace PdfSharpCore.Pdf.AcroForms
 {
@@ -78,6 +79,18 @@ namespace PdfSharpCore.Pdf.AcroForms
         }
         PdfResources resources;
 
+        /// <summary>
+        /// Gets the <see cref="PdfResources"/> of this <see cref="PdfAcroForm"/> or creates a new one if none exist
+        /// </summary>
+        /// <returns>The <see cref="PdfResources"/> of this AcroForm</returns>
+        internal PdfResources GetOrCreateResources()
+        {
+            var resources = Resources;
+            if (resources == null)
+                Elements.Add(Keys.DR, new PdfResources(_document));
+            return Resources;
+        }
+
 
         internal override void PrepareForSave()
         {
@@ -111,6 +124,159 @@ namespace PdfSharpCore.Pdf.AcroForms
                 field.Flatten();
             }
             _document.Catalog.AcroForm = null;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfTextField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfTextField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfTextField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfTextField AddTextField(Func<PdfTextField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfTextField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfCheckBoxField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfCheckBoxField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfCheckBoxField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfCheckBoxField AddCheckBoxField(Func<PdfCheckBoxField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfCheckBoxField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfRadioButtonField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfRadioButtonField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfRadioButtonField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfRadioButtonField AddRadioButtonField(Func<PdfRadioButtonField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfRadioButtonField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfComboBoxField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfComboBoxField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfComboBoxField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfComboBoxField AddComboBoxField(Func<PdfComboBoxField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfComboBoxField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfListBoxField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfListBoxField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfListBoxField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfListBoxField AddListBoxField(Func<PdfListBoxField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfListBoxField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfPushButtonField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfPushButtonField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfPushButtonField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfPushButtonField AddPushButtonField(Func<PdfPushButtonField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfPushButtonField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfSignatureField"/> to the <see cref="PdfAcroForm"/>
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfSignatureField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfSignatureField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfSignatureField AddSignatureField(Func<PdfSignatureField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfSignatureField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
+        }
+
+        /// <summary>
+        /// Adds a new <see cref="PdfGenericField"/> to the <see cref="PdfAcroForm"/><br></br>
+        /// Typically used as a container for other fields
+        /// </summary>
+        /// <param name="configure">
+        /// A method that receives the new <see cref="PdfGenericField"/> for further customization<br></br>
+        /// It should return true to add the field to the Field-List of this AcroForm, otherwise false (e.g. when the field is a child of another field)
+        /// </param>
+        /// <returns>The created and configured <see cref="PdfGenericField"/></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfGenericField AddGenericField(Func<PdfGenericField, bool> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+            var field = new PdfGenericField(_document);
+            if (configure(field))
+                Fields.Elements.Add(field);
+            return field;
         }
 
 

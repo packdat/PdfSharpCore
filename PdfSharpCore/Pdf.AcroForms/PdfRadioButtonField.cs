@@ -27,6 +27,7 @@
 // DEALINGS IN THE SOFTWARE.
 #endregion
 
+using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf.Annotations;
 using System;
 using System.Collections.Generic;
@@ -46,6 +47,7 @@ namespace PdfSharpCore.Pdf.AcroForms
             : base(document)
         {
             _document = document;
+            SetFlags |= PdfAcroFieldFlags.Radio;
         }
 
         internal PdfRadioButtonField(PdfDictionary dict)
@@ -102,7 +104,7 @@ namespace PdfSharpCore.Pdf.AcroForms
         }
 
         /// <summary>
-        /// Gets the (optional) export-values for each entry in this radio button group.<br></br>
+        /// Gets or sets the (optional) export-values for each entry in this radio button group.<br></br>
         /// If the field does not specify these, <b><see cref="Options"/></b> is returned.
         /// </summary>
         public ICollection<string> ExportValues
@@ -118,6 +120,15 @@ namespace PdfSharpCore.Pdf.AcroForms
                     return list;
                 }
                 return Options;
+            }
+            set
+            {
+                if (value.Count != Options.Count)
+                    throw new ArgumentException("Length of Opt-Array must match length of Options");
+                var optArray = new PdfArray();
+                foreach (var val in value)
+                    optArray.Elements.Add(new PdfString(val));
+                Elements[Keys.Opt] = optArray;
             }
         }
 
@@ -202,6 +213,101 @@ namespace PdfSharpCore.Pdf.AcroForms
                     }
                 }
             }
+        }
+
+        private void RenderAppearance()
+        {
+            for (var i = 0; i < Annotations.Elements.Count; i++)
+            {
+                var widget = Annotations.Elements[i];
+                var rect = widget.Rectangle;
+                if (widget.Page != null && !rect.IsEmpty)
+                {
+                    // existing/imported field ?
+                    if (widget.Elements.ContainsKey(PdfAnnotation.Keys.AP))
+                    {
+                        widget.Elements.SetName(PdfAnnotation.Keys.AS, i == SelectedIndex ? Options.ElementAt(i) : "/Off");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Creates the appearance-stream for the specified Widget.
+        /// </summary>
+        /// <param name="widget"></param>
+        /// <param name="nameOfOnState"></param>
+        private void CreateAppearance(PdfWidgetAnnotation widget, string nameOfOnState)
+        {
+            // remove possible leading slashes (will be re-added later)
+            nameOfOnState = nameOfOnState.TrimStart('/');
+
+            var rect = widget.Rectangle;
+            if (widget.Page != null && !rect.IsEmpty)
+            {
+                var xRect = new XRect(0, 0, Math.Max(1, rect.Width), Math.Max(1, rect.Height));
+                // checked state
+                var formChecked = new XForm(_document, xRect);
+                using (var gfx = XGraphics.FromForm(formChecked))
+                {
+                    gfx.IntersectClip(xRect);
+                    // draw border
+                    if (!widget.BorderColor.IsEmpty)
+                    {
+                        var borderPen = new XPen(widget.BorderColor);
+                        gfx.DrawEllipse(borderPen, 0, 0, rect.Width, rect.Height);
+                    }
+                    // draw a dot in the middle
+                    var dotRect = new XRect(xRect.Location, xRect.Size);
+                    dotRect.Inflate(-xRect.Width / 4.0, -xRect.Height / 4.0);
+                    gfx.DrawEllipse(new XSolidBrush(ForeColor), dotRect);
+                }
+                formChecked.DrawingFinished();
+
+                // unchecked state
+                var formUnchecked = new XForm(_document, rect.ToXRect());
+                using (var gfx = XGraphics.FromForm(formUnchecked))
+                {
+                    gfx.IntersectClip(xRect);
+                    // draw border
+                    if (!widget.BorderColor.IsEmpty)
+                    {
+                        var borderPen = new XPen(widget.BorderColor);
+                        gfx.DrawEllipse(borderPen, 0, 0, rect.Width, rect.Height);
+                    }
+                }
+                formUnchecked.DrawingFinished();
+
+                var ap = new PdfDictionary(_document);
+                var nDict = new PdfDictionary(_document);
+                ap.Elements.SetValue("/N", nDict);
+                nDict.Elements[new PdfName("/" + nameOfOnState)] = formChecked.PdfForm.Reference;
+                nDict.Elements["/Off"] = formUnchecked.PdfForm.Reference;
+                widget.Elements[PdfAnnotation.Keys.AP] = ap;
+            }
+        }
+
+        /// <summary>
+        /// A special overload for RadioButtons that allows specifying the name for the "On"-State of an individual radio-button
+        /// </summary>
+        /// <param name="nameOfOnState">Name of the "On"-State of this RadioButton</param>
+        /// <param name="configure">A method that is used to configure the Annotation</param>
+        /// <returns>The created and configured Annotation</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfWidgetAnnotation AddAnnotation(string nameOfOnState, Action<PdfWidgetAnnotation> configure)
+        {
+            if (string.IsNullOrWhiteSpace(nameOfOnState))
+                throw new ArgumentNullException(nameof(nameOfOnState), "Name of state must not be null or empty");
+
+            var annot = AddAnnotation(configure);
+            CreateAppearance(annot, nameOfOnState);
+            return annot;
+        }
+
+        internal override void PrepareForSave()
+        {
+            base.PrepareForSave();
+            RenderAppearance();
         }
 
         /// <summary>

@@ -49,7 +49,9 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         internal PdfTextField(PdfDocument document)
             : base(document)
-        { }
+        {
+            Elements.SetName(Keys.FT, "Tx");
+        }
 
         internal PdfTextField(PdfDictionary dict)
             : base(dict)
@@ -198,9 +200,7 @@ namespace PdfSharpCore.Pdf.AcroForms
                             gfx.DrawString(text, Font, new XSolidBrush(ForeColor), xRect, format);
                     }
                 }
-
                 form.DrawingFinished();
-                form.PdfForm.Elements.Add("/FormType", new PdfLiteral("1"));
 
                 SetXFormFont(form);
                 
@@ -222,6 +222,15 @@ namespace PdfSharpCore.Pdf.AcroForms
                 // the text is not rendered by PDF Reader 9 or higher.
                 s = "/Tx BMC\n" + s + "\nEMC";
                 xobj.Stream.Value = new RawEncoding().GetBytes(s);
+            }
+            // create DefaultAppearance for newly created fields (required according to the spec)
+            if (!Elements.ContainsKey(Keys.DA))
+            {
+                var pdfFont = _document.FontTable.GetFont(Font);
+                var formResources = _document.AcroForm.GetOrCreateResources();
+                var fontName = formResources.AddFont(pdfFont);
+                Elements.Add(Keys.DA, new PdfString(string.Format("{0} {1} Tf {2} {3} {4} rg",
+                    fontName, Font.Size, ForeColor.R, ForeColor.G, ForeColor.B)));
             }
         }
 

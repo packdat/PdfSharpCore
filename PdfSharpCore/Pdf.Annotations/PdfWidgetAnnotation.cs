@@ -46,6 +46,8 @@ namespace PdfSharpCore.Pdf.Annotations
             : base(document)
         {
             Initialize();
+            document._irefTable.Add(new Advanced.PdfReference(this));
+            Reference.Document = document;
         }
 
         /// <summary>
@@ -71,7 +73,18 @@ namespace PdfSharpCore.Pdf.Annotations
         public XColor BackColor
         {
             get { return backColor; }
-            //set { this.backColor = value; }
+            set 
+            {
+                this.backColor = value;
+                if (!Elements.ContainsKey(Keys.MK))
+                    Elements.Add(Keys.MK, new PdfDictionary());
+                var colArray = new PdfArray();
+                colArray.Elements.Add(new PdfReal(value.R / 255.0));
+                colArray.Elements.Add(new PdfReal(value.G / 255.0));
+                colArray.Elements.Add(new PdfReal(value.B / 255.0));
+                var mk = Elements.GetDictionary(Keys.MK);
+                mk.Elements["BG"] = colArray;
+            }
         }
         XColor backColor = XColor.Empty;
 
@@ -81,7 +94,18 @@ namespace PdfSharpCore.Pdf.Annotations
         public XColor BorderColor
         {
             get { return borderColor; }
-            //set { this.borderColor = value; }
+            set 
+            {
+                this.borderColor = value;
+                if (!Elements.ContainsKey(Keys.MK))
+                    Elements.Add(Keys.MK, new PdfDictionary());
+                var colArray = new PdfArray();
+                colArray.Elements.Add(new PdfReal(value.R / 255.0));
+                colArray.Elements.Add(new PdfReal(value.G / 255.0));
+                colArray.Elements.Add(new PdfReal(value.B / 255.0));
+                var mk = Elements.GetDictionary(Keys.MK);
+                mk.Elements["BC"] = colArray;
+            }
         }
         XColor borderColor = XColor.Empty;
 
@@ -115,6 +139,7 @@ namespace PdfSharpCore.Pdf.Annotations
             {
                 return Elements.GetObject(Keys.Parent);
             }
+            internal set { Elements.SetReference(Keys.Parent, value); }
         }
 
         private void DetermineAppearance()

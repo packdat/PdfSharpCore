@@ -42,7 +42,9 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         protected PdfChoiceField(PdfDocument document)
           : base(document)
-        { }
+        {
+            Elements.SetName(Keys.FT, "Ch");
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PdfChoiceField"/> class.

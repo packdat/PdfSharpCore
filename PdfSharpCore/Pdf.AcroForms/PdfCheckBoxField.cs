@@ -27,7 +27,10 @@
 // DEALINGS IN THE SOFTWARE.
 #endregion
 
+using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf.Annotations;
+using System;
+using System.Xml.Linq;
 
 namespace PdfSharpCore.Pdf.AcroForms
 {
@@ -85,10 +88,61 @@ namespace PdfSharpCore.Pdf.AcroForms
             for (var i = 0; i < Annotations.Elements.Count; i++)
             {
                 var widget = Annotations.Elements[i];
-                if (widget == null)
+                var rect = widget.Rectangle;
+                if (rect.IsEmpty)
                     continue;
+                // existing/imported field ?
+                if (widget.Elements.ContainsKey(PdfAnnotation.Keys.AP))
+                {
+                    widget.Elements.SetName(PdfAnnotation.Keys.AS, Checked ? GetNonOffValue() : "/Off");
+                }
+                else    // newly created field
+                {
+                    var xRect = new XRect(0, 0, Math.Max(1, rect.Width), Math.Max(1, rect.Height));
+                    // checked state
+                    var formChecked = new XForm(_document, xRect);
+                    using (var gfx = XGraphics.FromForm(formChecked))
+                    {
+                        gfx.IntersectClip(xRect);
+                        // draw border
+                        if (!widget.BorderColor.IsEmpty)
+                        {
+                            var borderPen = new XPen(widget.BorderColor);
+                            gfx.DrawRectangle(borderPen, 0, 0, rect.Width, rect.Height);
+                        }
+                        // draw an X-shape
+                        var pen = new XPen(ForeColor, 2)
+                        {
+                            LineCap = XLineCap.Round
+                        };
+                        var pad = 2;
+                        gfx.DrawLine(pen, 0 + pad, pad, rect.Width - pad, rect.Height - pad);
+                        gfx.DrawLine(pen, 0 + pad, rect.Height - pad, rect.Width - pad, pad);
+                    }
+                    formChecked.DrawingFinished();
 
-                widget.Elements.SetName(PdfAnnotation.Keys.AS, Checked ? GetNonOffValue() : "/Off");
+                    // unchecked state
+                    var formUnchecked = new XForm(_document, rect.ToXRect());
+                    using (var gfx = XGraphics.FromForm(formUnchecked))
+                    {
+                        gfx.IntersectClip(xRect);
+                        // draw border
+                        if (!widget.BorderColor.IsEmpty)
+                        {
+                            var borderPen = new XPen(widget.BorderColor);
+                            gfx.DrawRectangle(borderPen, 0, 0, rect.Width, rect.Height);
+                        }
+                    }
+                    formUnchecked.DrawingFinished();
+
+                    var ap = new PdfDictionary(_document);
+                    var nDict = new PdfDictionary(_document);
+                    ap.Elements.SetValue("/N", nDict);
+                    nDict.Elements["/Yes"] = formChecked.PdfForm.Reference;     // according to the spec (12.7.4.2.3)
+                    nDict.Elements["/Off"] = formUnchecked.PdfForm.Reference;
+                    widget.Elements[PdfAnnotation.Keys.AP] = ap;
+                    widget.Elements.SetName(PdfAnnotation.Keys.AS, Checked ? "/Yes" : "/Off");   // set appearance state
+                }
             }
         }
 

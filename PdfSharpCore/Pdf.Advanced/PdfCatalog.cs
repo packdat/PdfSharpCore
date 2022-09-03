@@ -161,7 +161,7 @@ namespace PdfSharpCore.Pdf.Advanced
         public PdfAcroForm AcroForm
         {
             get { return (PdfAcroForm)Elements.GetValue(Keys.AcroForm); }
-            set
+            internal set
             {
                 if (value != null)
                 {
@@ -208,8 +208,6 @@ namespace PdfSharpCore.Pdf.Advanced
                     PageMode = PdfPageMode.UseOutlines;
                 _outline.PrepareForSave();
             }
-            if (AcroForm != null)
-                AcroForm.PrepareForSave();
         }
 
         internal override void WriteObject(PdfWriter writer)

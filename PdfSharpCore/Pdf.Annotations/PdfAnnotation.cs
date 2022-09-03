@@ -93,7 +93,8 @@ namespace PdfSharpCore.Pdf.Annotations
 
         /// <summary>
         /// Gets or sets the annotation rectangle, defining the location of the annotation
-        /// on the page in default user space units.
+        /// on the page in default user space units.<br></br>
+        /// Note the coordinates are measured from the <b>bottom-left</b> of the page (not the top-left !)
         /// </summary>
         public PdfRectangle Rectangle
         {
@@ -124,7 +125,15 @@ namespace PdfSharpCore.Pdf.Annotations
                 }
                 return pageRef != null && pageRef.Value is PdfDictionary ? pageRef.Value as PdfPage ?? new PdfPage((PdfDictionary)pageRef.Value) : null;
             }
-            set { Elements.SetReference(Keys.Page, value); }
+            set
+            {
+                var curPage = Page;
+                if (curPage != null)
+                    curPage.Annotations.Remove(this);
+                Elements.SetReference(Keys.Page, value);
+                if (!value.Annotations.Elements.Contains(Reference))
+                    value.Annotations.Add(this);
+            }
         }
 
         /// <summary>
@@ -234,6 +243,21 @@ namespace PdfSharpCore.Pdf.Annotations
         {
             get { return Elements.GetInteger(Keys.StructParent); }
             set { Elements.SetInteger(Keys.StructParent, value); }
+        }
+
+        /// <summary>
+        /// Convenience-method that serves 2 purposes:<br></br>
+        /// 1: It allows setting the <see cref="Page"/> and the <see cref="Rectangle"/> with one call<br></br>
+        /// 2: It eases placing the annotation on the page by using the <b>top-left</b> of the page as the origin<br></br>
+        ///    (as opposed to the <b>bottom-left</b>, which would be the case when setting <see cref="Rectangle"/>)
+        /// </summary>
+        /// <param name="page">The <see cref="PdfPage"/> the annotation should be placed on</param>
+        /// <param name="rectangle">The rectangle of the Annotation. The position should be relative to the top-left of the page</param>
+        public void PlaceOnPage(PdfPage page, PdfRectangle rectangle)
+        {
+            Page = page;
+            var location = new XPoint(rectangle.X1, page.Height.Point - rectangle.Y2);
+            Rectangle = new PdfRectangle(location, rectangle.Size);
         }
 
         private PdfPage TryFindPage()

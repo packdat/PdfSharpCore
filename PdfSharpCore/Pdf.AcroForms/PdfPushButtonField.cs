@@ -43,6 +43,7 @@ namespace PdfSharpCore.Pdf.AcroForms
             : base(document)
         {
             _document = document;
+            SetFlags |= PdfAcroFieldFlags.Pushbutton;
         }
 
         internal PdfPushButtonField(PdfDictionary dict)

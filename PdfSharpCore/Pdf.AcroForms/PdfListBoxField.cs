@@ -74,7 +74,8 @@ namespace PdfSharpCore.Pdf.AcroForms
         XColor highlightTextColor = XColors.White;
 
         /// <summary>
-        /// Gets or sets the value for this field
+        /// Gets or sets the value for this ListBox<br></br>
+        /// Note: As a <see cref="PdfListBoxField"/> may have multiple values selected, it is recommended to use <see cref="SelectedIndices"/> instead
         /// </summary>
         public override PdfItem Value
         {
@@ -177,7 +178,9 @@ namespace PdfSharpCore.Pdf.AcroForms
 
         void RenderAppearance()
         {
-            var format = TextAlign == TextAlignment.Left ? XStringFormats.CenterLeft : TextAlign == TextAlignment.Center ? XStringFormats.Center : XStringFormats.CenterRight;
+            var format = TextAlign == TextAlignment.Left 
+                ? XStringFormats.CenterLeft
+                : TextAlign == TextAlignment.Center ? XStringFormats.Center : XStringFormats.CenterRight;
             for (var idx = 0; idx < Annotations.Elements.Count; idx++)
             {
                 var widget = Annotations.Elements[idx];
@@ -258,6 +261,8 @@ namespace PdfSharpCore.Pdf.AcroForms
                             var xRect = new XRect(rect.X1, widget.Page.Height.Point - rect.Y2, rect.Width, rect.Height);
                             gfx.Save();
                             gfx.IntersectClip(xRect);
+                            // TODO: shouldn't we only render the selected items ?
+                            // what is the point in rendering the unselected items when flattening ?
                             for (var index = TopIndex; index < Values.Count; index++)
                             {
                                 var text = Values.ElementAt(index);

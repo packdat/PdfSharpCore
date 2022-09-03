@@ -45,7 +45,9 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         internal PdfComboBoxField(PdfDocument document)
             : base(document)
-        { }
+        {
+            SetFlags |= PdfAcroFieldFlags.Combo;
+        }
 
         internal PdfComboBoxField(PdfDictionary dict)
             : base(dict)

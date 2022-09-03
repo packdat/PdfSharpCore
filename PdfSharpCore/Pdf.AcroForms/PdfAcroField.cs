@@ -55,7 +55,10 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         internal PdfAcroField(PdfDocument document)
             : base(document)
-        { }
+        {
+            document._irefTable.Add(new PdfReference(this));
+            Reference.Document = document;
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PdfAcroField"/> class. Used for type transformation.
@@ -77,6 +80,7 @@ namespace PdfSharpCore.Pdf.AcroForms
                 string name = Elements.GetString(Keys.T);
                 return name;
             }
+            set { Elements.SetString(Keys.T, value); }
         }
 
         /// <summary>
@@ -85,6 +89,7 @@ namespace PdfSharpCore.Pdf.AcroForms
         public string AlternateName
         {
             get { return Elements.GetString(Keys.TU); }
+            set { Elements.SetString(Keys.TU, value); }
         }
 
         /// <summary>
@@ -93,6 +98,7 @@ namespace PdfSharpCore.Pdf.AcroForms
         public string MappingName
         {
             get { return Elements.GetString(Keys.TM); }
+            set { Elements.SetString(Keys.TM, value); }
         }
 
         /// <summary>
@@ -127,6 +133,13 @@ namespace PdfSharpCore.Pdf.AcroForms
                 if (parentRef != null)
                     return PdfAcroFieldCollection.CreateAcroField(parentRef.Value as PdfDictionary);
                 return null;
+            }
+            internal set
+            {
+                if (value != null)
+                    Elements.SetReference(Keys.Parent, value);
+                else
+                    Elements[Keys.Parent] = PdfNull.Value;
             }
         }
 
@@ -500,6 +513,39 @@ namespace PdfSharpCore.Pdf.AcroForms
         PdfAnnotationArray _annotations;
 
         /// <summary>
+        /// Adds a new Annotation to this field.
+        /// </summary>
+        /// <param name="configure">A method that is used to configure the Annotation</param>
+        /// <returns>The created and configured Annotation</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public PdfWidgetAnnotation AddAnnotation(Action<PdfWidgetAnnotation> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+
+            var annotation = new PdfWidgetAnnotation(_document)
+            {
+                ParentField = this
+            };
+            configure(annotation);
+            if (!Elements.ContainsKey(Keys.Kids))
+                Elements.GetValue(Keys.Kids, VCF.CreateIndirect);
+            var childs = Elements.GetArray(Keys.Kids);
+            childs.Elements.Add(annotation.Reference);
+            return annotation;
+        }
+
+        /// <summary>
+        /// Adds the specified <see cref="PdfAcroField"/> to the list of child-fields of this field
+        /// </summary>
+        /// <param name="childField"></param>
+        public void AddChild(PdfAcroField childField)
+        {
+            Fields.Elements.Add(childField);
+            childField.Parent = this;
+        }
+
+        /// <summary>
         /// Tries to determine the Appearance of the Field by checking elements of its dictionary
         /// </summary>
         protected internal virtual void DetermineAppearance()
@@ -729,6 +775,13 @@ namespace PdfSharpCore.Pdf.AcroForms
         internal override void PrepareForSave()
         {
             base.PrepareForSave();
+            // for newly created fields, add the font to the AcroForm's resources
+            if (Font != null && !Font.FromDocument)
+            {
+                var formResources = _document.AcroForm.GetOrCreateResources();
+                var pdfFont = _document.FontTable.GetFont(Font);
+                formResources.AddFont(pdfFont);
+            }
             if (HasKids)
             {
                 for (var i = 0; i < Fields.Elements.Count; i++)

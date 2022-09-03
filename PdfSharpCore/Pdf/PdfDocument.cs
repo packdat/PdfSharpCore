@@ -408,6 +408,10 @@ namespace PdfSharpCore.Pdf
             }
             info.Elements.SetString(PdfDocumentInformation.Keys.Producer, producer);
 
+            // Prepare AcroForm. Must occur BEFORE preparing the Fonts !
+            if (Catalog.AcroForm != null)
+                Catalog.AcroForm.PrepareForSave();
+
             // Prepare used fonts.
             if (_fontTable != null)
                 _fontTable.PrepareForSave();
@@ -749,6 +753,24 @@ namespace PdfSharpCore.Pdf
             get { return _internals ?? (_internals = new PdfInternals(this)); }
         }
         PdfInternals _internals;
+
+        /// <summary>
+        /// Gets the existing <see cref="PdfAcroForm"/> or creates a new one, if there is no <see cref="PdfAcroForm"/> in the current document
+        /// </summary>
+        /// <returns>The <see cref="PdfAcroForm"/> associated with this document</returns>
+        public PdfAcroForm GetOrCreateAcroForm()
+        {
+            var form = AcroForm;
+            if (form == null)
+            {
+                form = new PdfAcroForm(this);
+                _irefTable.Add(new PdfReference(form));
+                form.Reference.Document = this;
+                Catalog.AcroForm = form;
+            }
+            return form;
+        }
+
 
         /// <summary>
         /// Creates a new page and adds it to this document.

@@ -45,7 +45,9 @@ namespace PdfSharpCore.Pdf.AcroForms
         /// </summary>
         protected PdfButtonField(PdfDocument document)
             : base(document)
-        { }
+        {
+            Elements.SetName(Keys.FT, "Btn");
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PdfButtonField"/> class.
@@ -78,6 +80,7 @@ namespace PdfSharpCore.Pdf.AcroForms
                                     return name;
                         }
                     }
+                    return "/Yes";  // return default (probably a newly created field)
                 }
             }
             return null;
