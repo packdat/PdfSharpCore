@@ -80,7 +80,6 @@ namespace PdfSharpCore.Pdf.AcroForms
                                     return name;
                         }
                     }
-                    return "/Yes";  // return default (probably a newly created field)
                 }
             }
             return null;

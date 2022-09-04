@@ -532,6 +532,8 @@ namespace PdfSharpCore.Pdf.AcroForms
                 Elements.GetValue(Keys.Kids, VCF.CreateIndirect);
             var childs = Elements.GetArray(Keys.Kids);
             childs.Elements.Add(annotation.Reference);
+            // re-create updated annotations the next time the "Annotations"-Property is accessed
+            _annotations = null;
             return annotation;
         }
 

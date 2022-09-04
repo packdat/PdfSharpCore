@@ -77,9 +77,8 @@ namespace PdfSharpCore.Pdf.AcroForms
             }
             set
             {
-                var name = value ? GetNonOffValue() : "/Off";
+                var name = value ? GetNonOffValue() ?? "/Yes" : "/Off";
                 Elements.SetName(PdfAcroField.Keys.V, name);
-                Elements.SetName(PdfAnnotation.Keys.AS, name);
             }
         }
 

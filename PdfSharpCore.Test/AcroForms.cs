@@ -183,12 +183,11 @@ namespace PdfSharpCore.Test
             var cbx2 = acroForm.AddCheckBoxField(field =>
             {
                 field.Name = "Interest_coding";
+                field.Checked = true;
                 field.AddAnnotation(annot =>
                 {
                     annot.PlaceOnPage(page1, new PdfRectangle(new XRect(x, y, 12, 12)));
                 });
-                // must be set AFTER adding the annotations !
-                field.Checked = true;
                 return true;
             });
             page1Renderer.DrawString("Coding", textFont, XBrushes.Black, x + 20, y + 10);
